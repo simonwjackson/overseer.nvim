@@ -144,6 +144,10 @@ function Task.new(opts)
   local bufnr = task:get_bufnr()
   if bufnr then
     vim.b[bufnr].overseer_task = task.id
+    -- Set custom filetype for edgy.nvim integration
+    if vim.bo[bufnr].buftype == "terminal" then
+      vim.bo[bufnr].filetype = "OverseerOutput"
+    end
   end
   return task
 end
@@ -706,6 +710,10 @@ function Task:start()
   if bufnr then
     vim.bo[bufnr].buflisted = false
     vim.b[bufnr].overseer_task = self.id
+    -- Set custom filetype for edgy.nvim integration
+    if vim.bo[bufnr].buftype == "terminal" then
+      vim.bo[bufnr].filetype = "OverseerOutput"
+    end
   end
 
   util.replace_buffer_in_wins(self.prev_bufnr, bufnr)
