@@ -251,6 +251,12 @@ local function build_task_args(tmpl, search, params)
   local task_defn = tmpl.builder(params)
   task_defn.components = component.resolve(task_defn.components or { "default" })
 
+  -- Store template description in metadata for enhanced task display
+  if tmpl.desc then
+    task_defn.metadata = task_defn.metadata or {}
+    task_defn.metadata.desc = tmpl.desc
+  end
+
   for _, hook in ipairs(hooks) do
     if hook_matches(hook.opts, search, tmpl.name, tmpl.module) then
       hook.hook(task_defn, task_util)

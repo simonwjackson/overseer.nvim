@@ -169,9 +169,35 @@ function Task:render(lines, highlights, detail)
     lines = { lines, "t" },
     detail = { detail, "n" },
   })
-  table.insert(lines, string.format("%s: %s", self.status, self.name))
+  
+  -- Check if task has a description in metadata
+  local desc = self.metadata and self.metadata.desc
+  local task_display
+  if desc and config.task_list.show_description then
+    -- Format with description using configurable format
+    local format_str = config.task_list.description_format or "%s (%s)"
+    task_display = string.format(format_str, self.name, desc)
+  else
+    task_display = self.name
+  end
+  
+  table.insert(lines, string.format("%s: %s", self.status, task_display))
   table.insert(highlights, { "Overseer" .. self.status, #lines, 0, string.len(self.status) })
-  table.insert(highlights, { "OverseerTask", #lines, string.len(self.status) + 2, -1 })
+  
+  if desc and config.task_list.show_description then
+    -- Highlight the name and description separately
+    local name_start = string.len(self.status) + 2
+    local name_end = name_start + string.len(self.name)
+    table.insert(highlights, { "OverseerTaskName", #lines, name_start, name_end })
+    
+    -- Find description start (after " (")
+    local desc_start = name_end + 2
+    local desc_end = desc_start + string.len(desc)
+    table.insert(highlights, { "OverseerTaskDesc", #lines, desc_start, desc_end })
+  else
+    -- Use original highlighting for backward compatibility
+    table.insert(highlights, { "OverseerTask", #lines, string.len(self.status) + 2, -1 })
+  end
 
   if self.strategy.render then
     self.strategy:render(lines, highlights, detail)

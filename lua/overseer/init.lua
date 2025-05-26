@@ -627,6 +627,16 @@ M.get_all_highlights = function()
       desc = "Used to render the name of a task or template",
     },
     {
+      name = "OverseerTaskName",
+      default = "Title",
+      desc = "Primary task name",
+    },
+    {
+      name = "OverseerTaskDesc",
+      default = "Comment",
+      desc = "Task description",
+    },
+    {
       name = "OverseerTaskBorder",
       default = "FloatBorder",
       desc = "The separator in the task list",
