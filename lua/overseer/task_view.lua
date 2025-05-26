@@ -129,6 +129,8 @@ local function get_empty_bufnr()
     vim.b[empty_bufnr].overseer_task = -1
     vim.api.nvim_buf_set_lines(empty_bufnr, 0, -1, true, { "--no task buffer--" })
     vim.bo[empty_bufnr].bufhidden = "wipe"
+    -- Set custom filetype for edgy.nvim integration
+    vim.bo[empty_bufnr].filetype = "OverseerOutput"
   end
   return empty_bufnr
 end
