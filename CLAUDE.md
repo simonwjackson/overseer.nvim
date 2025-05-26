@@ -132,6 +132,44 @@ The config system supports:
 - Logging configuration
 - Template loading and caching
 
+## Nix Flakes Support
+
+Phase 2 implementation (completed) includes:
+
+### Dynamic Discovery
+- Uses `nix flake show --json` to discover specific packages, apps, devShells, and checks
+- Generates individual templates for each discovered target (e.g., `nix build .#mypackage`)
+- Falls back gracefully to static templates if discovery fails
+
+### Configuration Options
+```lua
+-- In overseer setup
+nix = {
+  -- Enable dynamic discovery via `nix flake show`
+  dynamic_discovery = true,
+  -- Timeout for nix operations (ms)
+  timeout = 30000,
+  -- Target system (nil = auto-detect)
+  system = nil,
+  -- Include legacy default.nix support
+  legacy_support = true,
+  -- Cache discovery results
+  cache_discovery = true,
+}
+```
+
+### Caching Mechanism
+- Cache keys include `flake.nix` and `flake.lock` modification times
+- Uses overseer's existing template cache infrastructure
+- Automatic cache invalidation on file changes
+- Configurable timeout and cache thresholds
+
+### Enhanced Template Parameters
+- `extra_args`: Additional Nix command arguments
+- `system`: Target system override
+- `impure`: Allow impure evaluation
+- `show_trace`: Enable detailed error traces
+
 ## Key Files for Development
 
 - `lua/overseer/constants.lua`: Status codes and other constants
@@ -139,3 +177,4 @@ The config system supports:
 - `lua/overseer/log.lua`: Logging system
 - `lua/overseer/files.lua`: File system utilities
 - `lua/overseer/shell.lua`: Shell command utilities
+- `lua/overseer/template/nix.lua`: Nix flakes template provider with dynamic discovery
