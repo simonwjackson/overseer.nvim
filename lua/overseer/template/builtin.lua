@@ -2,6 +2,7 @@ return {
   "cargo",
   "just",
   "make",
+  "nix",
   "npm",
   "shell",
   "tox",
