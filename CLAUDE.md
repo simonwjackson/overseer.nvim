@@ -73,11 +73,18 @@ make clean
 ## Template System
 
 Templates are the primary way users define tasks. They can be:
-1. **File-based templates**: In `lua/overseer/template/` directory (builtin providers like make, npm, cargo, just)
+1. **File-based templates**: In `lua/overseer/template/` directory (builtin providers like make, npm, cargo, just, nix)
 2. **Provider-based templates**: Dynamic template generation based on project state
 3. **User-defined templates**: Custom templates via `overseer.register_template()`
 
-Template providers in `lua/overseer/template/` automatically scan for project files (Makefile, package.json, Cargo.toml, justfile, etc.) and generate appropriate task templates.
+Template providers in `lua/overseer/template/` automatically scan for project files (Makefile, package.json, Cargo.toml, justfile, flake.nix, etc.) and generate appropriate task templates.
+
+### Nix Flakes Support
+
+The Nix template provider (`lua/overseer/template/nix.lua`) provides integration with Nix flakes:
+- **Detection**: Searches for `flake.nix` files using upward directory traversal
+- **Static templates**: Provides common Nix commands (develop, build, run, flake check, flake update)
+- **Future phases**: Will include dynamic discovery via `nix flake show --json`
 
 ### Just Template with Submodules Support
 
