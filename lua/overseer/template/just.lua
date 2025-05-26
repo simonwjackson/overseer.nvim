@@ -28,22 +28,14 @@ local tmpl = {
   },
   generator = function(opts, cb)
     local ret = {}
-    local jid = vim.fn.jobstart({ "just", "--unstable", "--dump", "--dump-format", "json" }, {
-      cwd = opts.dir,
-      stdout_buffered = true,
-      on_stdout = vim.schedule_wrap(function(j, output)
-        local ok, data =
-          pcall(vim.json.decode, table.concat(output, ""), { luanil = { object = true } })
-        if not ok then
-          log:error("just produced invalid json: %s\n%s", data, output)
-          cb(ret)
-          return
-        end
-        assert(data)
-        for k, recipe in pairs(data.recipes) do
-          if recipe.private then
-            goto continue
-          end
+    
+    -- Helper function to process recipes and submodules
+    local function process_recipes(recipes, modules, module_path, first_recipe)
+      module_path = module_path or ""
+      
+      -- Process regular recipes
+      for k, recipe in pairs(recipes) do
+        if not recipe.private then
           local params_defn = {}
           for _, param in ipairs(recipe.parameters) do
             local param_defn = {
@@ -62,13 +54,18 @@ local tmpl = {
             end
             params_defn[param.name] = param_defn
           end
+          
+          local recipe_name = module_path == "" and recipe.name or (module_path .. "::" .. recipe.name)
+          local cmd_name = module_path == "" and recipe.name or (module_path .. "::" .. recipe.name)
+          
+          local is_first = module_path == "" and first_recipe and recipe.name == first_recipe
           table.insert(ret, {
-            name = string.format("just %s", recipe.name),
+            name = string.format("just %s", recipe_name),
             desc = recipe.doc,
-            priority = k == data.first and 55 or 60,
+            priority = is_first and 55 or (module_path == "" and 60 or 65),
             params = params_defn,
             builder = function(params)
-              local cmd = { "just", recipe.name }
+              local cmd = { "just", cmd_name }
               for _, param in ipairs(recipe.parameters) do
                 local v = params[param.name]
                 if v then
@@ -84,8 +81,37 @@ local tmpl = {
               }
             end,
           })
-          ::continue::
         end
+      end
+      
+      -- Process submodules
+      if modules then
+        for module_name, module_data in pairs(modules) do
+          local new_path = module_path == "" and module_name or (module_path .. "::" .. module_name)
+          -- Process both recipes and nested modules
+          if module_data.recipes or module_data.modules then
+            process_recipes(module_data.recipes or {}, module_data.modules, new_path)
+          end
+        end
+      end
+    end
+    
+    local jid = vim.fn.jobstart({ "just", "--unstable", "--dump", "--dump-format", "json" }, {
+      cwd = opts.dir,
+      stdout_buffered = true,
+      on_stdout = vim.schedule_wrap(function(j, output)
+        local ok, data =
+          pcall(vim.json.decode, table.concat(output, ""), { luanil = { object = true } })
+        if not ok then
+          log:error("just produced invalid json: %s\n%s", data, output)
+          cb(ret)
+          return
+        end
+        assert(data)
+        
+        -- Process main recipes and submodules
+        process_recipes(data.recipes or {}, data.modules, "", data.first)
+        
         cb(ret)
       end),
     })
