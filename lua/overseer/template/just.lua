@@ -103,7 +103,9 @@ local tmpl = {
           local new_path = module_path == "" and module_name or (module_path .. "::" .. module_name)
           -- Process both recipes and nested modules
           if module_data.recipes or module_data.modules then
-            process_recipes(module_data.recipes or {}, module_data.modules, new_path, nil, assignments)
+            -- Use module's assignments if available, fallback to parent assignments
+            local module_assignments = module_data.assignments or assignments
+            process_recipes(module_data.recipes or {}, module_data.modules, new_path, module_data.first, module_assignments)
           end
         end
       end

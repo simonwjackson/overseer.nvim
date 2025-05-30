@@ -339,4 +339,72 @@ describe("just template comprehensive tests", function()
     assert.truthy(test_undefined.params.missing)
     assert.equals("undefined_var", test_undefined.params.missing.default)
   end)
+  
+  it("should expand variable references in module parameter defaults", function()
+    local just_template = require("overseer.template.just")
+    
+    local original_jobstart = vim.fn.jobstart
+    vim.fn.jobstart = function(cmd, opts)
+      if cmd[1] == "just" and vim.tbl_contains(cmd, "--dump") then
+        local mock_data = {
+          assignments = {
+            main_var = { value = "main_value", name = "main_var", export = false, private = false }
+          },
+          recipes = {},
+          modules = {
+            mymod = {
+              assignments = {
+                mod_var = { value = "module_value", name = "mod_var", export = false, private = false }
+              },
+              recipes = {
+                ["mod-recipe"] = {
+                  name = "mod-recipe",
+                  doc = "Recipe in module with variable default",
+                  private = false,
+                  parameters = {
+                    {
+                      name = "arg",
+                      kind = "singular",
+                      default = { "variable", "mod_var" }
+                    }
+                  }
+                }
+              },
+              first = "mod-recipe"
+            }
+          }
+        }
+        
+        vim.schedule(function()
+          opts.on_stdout(nil, { vim.json.encode(mock_data) })
+        end)
+        return 1
+      end
+      return original_jobstart(cmd, opts)
+    end
+    
+    local templates = {}
+    just_template.generator({ dir = "/test" }, function(results)
+      templates = results
+    end)
+    
+    vim.wait(100)
+    vim.fn.jobstart = original_jobstart
+    
+    assert.equals(1, #templates)
+    
+    -- Find the module template
+    local mod_template
+    for _, tmpl in ipairs(templates) do
+      if tmpl.name == "just mymod::mod-recipe" then
+        mod_template = tmpl
+        break
+      end
+    end
+    
+    -- Test module variable expansion
+    assert.truthy(mod_template)
+    assert.truthy(mod_template.params.arg)
+    assert.equals("module_value", mod_template.params.arg.default)
+  end)
 end)
