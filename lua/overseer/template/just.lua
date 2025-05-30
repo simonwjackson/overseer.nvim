@@ -29,15 +29,34 @@ local tmpl = {
   generator = function(opts, cb)
     local ret = {}
     
-    -- Helper function to resolve variable references in parameter defaults
+    -- Helper function to resolve variable references and function calls in parameter defaults
     local function resolve_default_value(default_value, assignments)
-      if type(default_value) == "table" and #default_value == 2 and default_value[1] == "variable" then
-        local var_name = default_value[2]
-        if assignments and assignments[var_name] then
-          return assignments[var_name].value
+      if type(default_value) == "table" and #default_value >= 2 then
+        if default_value[1] == "variable" then
+          local var_name = default_value[2]
+          if assignments and assignments[var_name] then
+            return resolve_default_value(assignments[var_name].value, assignments)
+          end
+          -- If variable not found, return the variable name as fallback
+          return var_name
+        elseif default_value[1] == "call" then
+          local func_name = default_value[2]
+          if func_name == "env" then
+            local env_var = default_value[3]
+            local env_default = default_value[4]
+            local env_value = vim.env[env_var]
+            if env_value ~= nil then
+              return env_value
+            elseif env_default then
+              return env_default
+            else
+              -- Return nil to indicate the environment variable is missing
+              return nil
+            end
+          end
+          -- For other function calls, return the raw value as fallback
+          return default_value
         end
-        -- If variable not found, return the variable name as fallback
-        return var_name
       end
       return default_value
     end

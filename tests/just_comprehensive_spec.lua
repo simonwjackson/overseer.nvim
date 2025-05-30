@@ -407,4 +407,94 @@ describe("just template comprehensive tests", function()
     assert.truthy(mod_template.params.arg)
     assert.equals("module_value", mod_template.params.arg.default)
   end)
+  
+  it("should expand env function calls in parameter defaults", function()
+    local just_template = require("overseer.template.just")
+    
+    -- Set up test environment variables
+    local original_env = vim.env
+    vim.env = vim.tbl_extend("force", vim.env or {}, {
+      TEST_ASDF = "test_value_1",
+      TEST_QWERTY = "test_value_2"
+    })
+    
+    local original_jobstart = vim.fn.jobstart
+    vim.fn.jobstart = function(cmd, opts)
+      if cmd[1] == "just" and vim.tbl_contains(cmd, "--dump") then
+        local mock_data = {
+          assignments = {
+            x = { value = { "call", "env", "TEST_ASDF" }, name = "x", export = false, private = false },
+            y = { value = { "call", "env", "TEST_QWERTY", "default_val" }, name = "y", export = false, private = false },
+            z = { value = { "call", "env", "TEST_MISSING", "fallback" }, name = "z", export = false, private = false }
+          },
+          recipes = {
+            test_env = {
+              name = "test_env",
+              doc = "Test env function expansion",
+              private = false,
+              parameters = {
+                {
+                  name = "x",
+                  kind = "singular",
+                  default = { "variable", "x" }
+                },
+                {
+                  name = "y", 
+                  kind = "singular",
+                  default = { "variable", "y" }
+                },
+                {
+                  name = "z",
+                  kind = "singular", 
+                  default = { "variable", "z" }
+                },
+                {
+                  name = "direct",
+                  kind = "singular",
+                  default = { "call", "env", "TEST_ASDF" }
+                }
+              }
+            }
+          }
+        }
+        
+        vim.schedule(function()
+          opts.on_stdout(nil, { vim.json.encode(mock_data) })
+        end)
+        return 1
+      end
+      return original_jobstart(cmd, opts)
+    end
+    
+    local templates = {}
+    just_template.generator({ dir = "/test" }, function(results)
+      templates = results
+    end)
+    
+    vim.wait(100)
+    vim.fn.jobstart = original_jobstart
+    vim.env = original_env
+    
+    assert.equals(1, #templates)
+    
+    local test_template = templates[1]
+    assert.equals("just test_env", test_template.name)
+    assert.truthy(test_template.params)
+    
+    -- Test env variable with value
+    assert.truthy(test_template.params.x)
+    assert.equals("test_value_1", test_template.params.x.default)
+    
+    -- Test env variable with value (should ignore default)
+    assert.truthy(test_template.params.y)
+    assert.equals("test_value_2", test_template.params.y.default)
+    
+    -- Test env variable missing (should use fallback)
+    assert.truthy(test_template.params.z)
+    assert.equals("fallback", test_template.params.z.default)
+    
+    -- Test direct env call
+    assert.truthy(test_template.params.direct)
+    assert.equals("test_value_1", test_template.params.direct.default)
+  end)
 end)
