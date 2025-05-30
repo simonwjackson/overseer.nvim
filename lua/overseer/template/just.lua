@@ -29,8 +29,21 @@ local tmpl = {
   generator = function(opts, cb)
     local ret = {}
     
+    -- Helper function to resolve variable references in parameter defaults
+    local function resolve_default_value(default_value, assignments)
+      if type(default_value) == "table" and #default_value == 2 and default_value[1] == "variable" then
+        local var_name = default_value[2]
+        if assignments and assignments[var_name] then
+          return assignments[var_name].value
+        end
+        -- If variable not found, return the variable name as fallback
+        return var_name
+      end
+      return default_value
+    end
+    
     -- Helper function to process recipes and submodules
-    local function process_recipes(recipes, modules, module_path, first_recipe)
+    local function process_recipes(recipes, modules, module_path, first_recipe, assignments)
       module_path = module_path or ""
       
       -- Process regular recipes
@@ -39,7 +52,7 @@ local tmpl = {
           local params_defn = {}
           for _, param in ipairs(recipe.parameters) do
             local param_defn = {
-              default = param.default,
+              default = resolve_default_value(param.default, assignments),
               type = param.kind == "singular" and "string" or "list",
               delimiter = " ",
             }
@@ -90,7 +103,7 @@ local tmpl = {
           local new_path = module_path == "" and module_name or (module_path .. "::" .. module_name)
           -- Process both recipes and nested modules
           if module_data.recipes or module_data.modules then
-            process_recipes(module_data.recipes or {}, module_data.modules, new_path)
+            process_recipes(module_data.recipes or {}, module_data.modules, new_path, nil, assignments)
           end
         end
       end
@@ -110,7 +123,7 @@ local tmpl = {
         assert(data)
         
         -- Process main recipes and submodules
-        process_recipes(data.recipes or {}, data.modules, "", data.first)
+        process_recipes(data.recipes or {}, data.modules, "", data.first, data.assignments)
         
         cb(ret)
       end),
