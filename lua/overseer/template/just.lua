@@ -31,20 +31,45 @@ local tmpl = {
     
     -- Helper function to resolve variable references in parameter defaults
     local function resolve_default_value(default_value, assignments)
+      -- Validate assignments parameter
+      if not assignments then
+        log:debug("resolve_default_value called with nil assignments")
+        if type(default_value) == "table" and #default_value == 2 and default_value[1] == "variable" then
+          return default_value[2] -- Return variable name as fallback
+        end
+        return default_value
+      end
+      
+      if vim.tbl_isempty(assignments) then
+        log:debug("resolve_default_value called with empty assignments table")
+      end
+      
       if type(default_value) == "table" and #default_value == 2 and default_value[1] == "variable" then
         local var_name = default_value[2]
-        if assignments and assignments[var_name] then
-          return assignments[var_name].value
+        log:debug("Looking for variable '%s' in assignments", var_name)
+        
+        if assignments[var_name] then
+          local value = assignments[var_name].value
+          log:debug("Found variable '%s' with value: %s", var_name, vim.inspect(value))
+          return value
+        else
+          log:debug("Variable '%s' not found in assignments. Available: %s", 
+            var_name, table.concat(vim.tbl_keys(assignments), ", "))
         end
-        -- If variable not found, return the variable name as fallback
+        
         return var_name
       end
+      
       return default_value
     end
     
     -- Helper function to process recipes and submodules
     local function process_recipes(recipes, modules, module_path, first_recipe, assignments)
       module_path = module_path or ""
+      assignments = assignments or {} -- Ensure assignments is never nil
+      
+      log:debug("process_recipes called with module_path='%s', assignments=%s", 
+        module_path, vim.inspect(vim.tbl_keys(assignments)))
       
       -- Process regular recipes
       for k, recipe in pairs(recipes) do
@@ -103,7 +128,7 @@ local tmpl = {
           local new_path = module_path == "" and module_name or (module_path .. "::" .. module_name)
           -- Process both recipes and nested modules
           if module_data.recipes or module_data.modules then
-            process_recipes(module_data.recipes or {}, module_data.modules, new_path, nil, assignments)
+            process_recipes(module_data.recipes or {}, module_data.modules, new_path, first_recipe, assignments)
           end
         end
       end
@@ -122,8 +147,17 @@ local tmpl = {
         end
         assert(data)
         
+        -- Validate and log assignments
+        local assignments = data.assignments or {}
+        log:debug("Parsed assignments: %s", vim.inspect(assignments))
+        log:debug("Assignment count: %d", vim.tbl_count(assignments))
+        
+        if vim.tbl_isempty(assignments) then
+          log:warn("No assignments found in just dump output")
+        end
+        
         -- Process main recipes and submodules
-        process_recipes(data.recipes or {}, data.modules, "", data.first, data.assignments)
+        process_recipes(data.recipes or {}, data.modules, "", data.first, assignments)
         
         cb(ret)
       end),
